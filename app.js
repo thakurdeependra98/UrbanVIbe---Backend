@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const path = require("path");
 const app = express();
 const cors = require("cors");
 const passport = require("passport");
@@ -26,6 +27,7 @@ app.use(
 
 app.use(cookieParser());
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use(passport.initialize());
 

@@ -66,18 +66,10 @@ const productSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Images
-    images: [
-      {
-        url: {
-          type: String,
-          required: true,
-        },
-        publicId: {
-          type: String,
-        },
-      },
-    ],
+    image: {
+      type: String,
+      trim: true,
+    },
 
     // Product Variants
     // variants: [
@@ -144,7 +136,7 @@ const productSchema = new mongoose.Schema(
     // },
 
     // Store Flags
-    isFeatured: {
+    isTodayDeal: {
       type: Boolean,
       default: false,
     },

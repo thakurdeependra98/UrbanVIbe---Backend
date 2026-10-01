@@ -1,5 +1,5 @@
 const cart = require("../models/cartSchema");
-const products = require("../models/productSchema");
+const { default: products } = require("../models/productSchema");
 const mongoose = require("mongoose");
 
 exports.addToCart = async (req, res) => {

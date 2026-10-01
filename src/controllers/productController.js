@@ -1,8 +1,9 @@
 const { default: products} = require('../models/productSchema');
+const mongoose = require('mongoose');
 
 exports.getProducts = async (req, res) => {
   try {
-    const categorySlug = req.query.category?.trim().toLowerCase();
+    const categorySlug = req.params.category || req.query.category;
     const allProducts = await products.find({}).populate("category", "name slug");
     const productList = categorySlug
       ? allProducts.filter((product) => product.category?.slug === categorySlug)
@@ -20,7 +21,8 @@ exports.getProducts = async (req, res) => {
 
 exports.crearteProduct = async (req, res) => {
   try {
-    const { title, description, price, oldPrice, category, image } = req.body;
+    const { title, description, price, oldPrice, category } = req.body;
+    const image = req.file ? `/uploads/${req.file.filename}` : req.body.image;
     const sellerId = req.user.id;
 
     const newProduct = new products({
@@ -55,6 +57,24 @@ exports.getProductsById = async (req, res) => {
   }
 };
 
+exports.getProductDetails = async (req, res) => {
+  try {
+    const productId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ msg: "Invalid product ID" });
+    }
+
+    const productDetails = await products.findById(productId).populate("category", "name slug");
+    if (!productDetails) {
+      return res.status(404).json({ msg: "Product not found" });
+    }
+    res.status(200).json(productDetails);
+  } catch (error) {
+    console.error("Error fetching product details:", error);
+    res.status(500).send("Server Error");
+  }
+}
+
 exports.deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -72,7 +92,8 @@ exports.deleteProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, price, oldPrice, category, image } = req.body;
+    const { title, description, price, oldPrice, category } = req.body;
+    const image = req.file ? `/uploads/${req.file.filename}` : req.body.image;
 
     const updatedProduct = await products.findByIdAndUpdate(
       id,
