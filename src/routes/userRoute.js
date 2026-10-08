@@ -1,11 +1,13 @@
 require("dotenv").config();
 const express = require("express");
 const passport = require("passport");
+const authMiddleware = require("../middleware/authMiddleware");
 const {
   registerUser,
   loginUser,
   logout,
   getAllUsers,
+  getProfile,
 } = require("../controllers/userControllers/authController");
 const router = express.Router();
 
@@ -13,6 +15,7 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.get("/logout", logout);
 router.get("/users", getAllUsers);
+router.get("/profile", authMiddleware, getProfile);
 
 router.get(
   "/auth/google",

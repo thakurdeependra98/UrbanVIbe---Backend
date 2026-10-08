@@ -2,18 +2,30 @@ const jwt = require("jsonwebtoken");
 
 const authMiddleware = (req, res, next) => {
   try {
-    const token = req.cookies?.token; // Safely access req.cookies.token
+    const cookieToken = req.cookies?.token;
+    const authorizationHeader = req.headers.authorization;
+    const headerToken = authorizationHeader?.match(/^Bearer\s+(.+)$/i)?.[1].trim();
+    const token = headerToken || cookieToken;
 
     if (!token) {
       return res.status(401).json({ msg: "Unauthorized: No token provided" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Attach user info to the request object
+    req.user = decoded;
     next();
-  } catch (err) {
-    console.error("Error verifying token:", err);
-    return res.status(401).json({ msg: "Unauthorized: Invalid token" });
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        msg: "Session expired. Please login again.",
+      });
+    }
+
+    return res.status(401).json({
+      success: false,
+      msg: "Invalid token. Please login again.",
+    });
   }
 };
 

@@ -92,3 +92,17 @@ exports.getAllUsers = async (req, res) => {
     res.status(500).send("Server Error");
   }
 }
+
+exports.getProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await users.findById(userId);
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    res.status(500).json({ msg: "Server error" });
+  }
+};

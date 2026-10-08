@@ -24,7 +24,20 @@ const userSchema = new mongoose.Schema({
     enum: ['admin', 'seller', 'buyer'],
     required: true
   },
-
+  cartItems: [
+    {
+      productId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product',
+      }
+    },
+  ],
+  wishlistItems: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+    },
+  ],
 },{timestamps: true})
 
 userSchema.plugin(passportLocalMongoose);

@@ -1,4 +1,5 @@
 const cart = require("../models/cartSchema");
+const users = require("../models/userSchema");
 const { default: products } = require("../models/productSchema");
 const mongoose = require("mongoose");
 
@@ -20,11 +21,16 @@ exports.addToCart = async (req, res) => {
       return res.status(404).json({ msg: "Product not found" });
     }
 
+    const user = await users.findById(userId);
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
     let cartItem = await cart.findOne({ userId, productId });
+    let statusCode = 200;
     if (cartItem) {
       cartItem.quantity += quantity || 1;
       await cartItem.save();
-      return res.status(200).json(cartItem);
     } else {
       const newCartItem = new cart({
         userId,
@@ -32,8 +38,20 @@ exports.addToCart = async (req, res) => {
         quantity: quantity || 1,
       });
       await newCartItem.save();
-      return res.status(201).json(newCartItem);
+      cartItem = newCartItem;
+      statusCode = 201;
     }
+
+    const productAlreadyInUserCart = (user.cartItems || []).some((item) =>
+      String(item.productId) === String(validId)
+    );
+
+    if (!productAlreadyInUserCart) {
+      user.cartItems.push({ productId: validId });
+      await user.save();
+    }
+
+    return res.status(statusCode).json(cartItem);
   } catch (error) {
     console.error("Error adding to cart:", error); 
     res.status(500).send("Server Error");
@@ -54,14 +72,21 @@ exports.getCartItems = async (req, res) => {
   }
 }
 
-exports.deleteCartItem = async (req, res) => {
+exports.removeCartItem = async (req, res) => {
   try {
-    const { id } = req.params; // Ensure the frontend sends the correct cart item ID
-    const cartItem = await cart.findByIdAndDelete(id);
+    const { id } = req.params;
+    const userId = req.user.id;
+    // Ensure the frontend sends the correct cart item ID
+    const cartItem = await cart.findOneAndDelete({ _id: id, userId });
+    const user = await users.findById(userId);
     if (!cartItem) {
       return res.status(404).json({ msg: "Cart item not found" });
     }
-    res.status(200).json({ msg: "Cart item deleted successfully", cartItem });
+    if (cartItem.productId) {
+      user.cartItems = user.cartItems.filter((item) => String(item.productId) !== String(cartItem.productId));
+      await user.save();
+    }
+    res.status(200).json({ msg: "Cart item Removed successfully", cartItem });
   } catch (error) {
     console.error("Error deleting cart item:", error); 
     res.status(500).send("Server Error");
@@ -71,7 +96,7 @@ exports.deleteCartItem = async (req, res) => {
 exports.increaseQuantity = async (req, res) => {
   try {
     const { id } = req.params; 
-    const cartItem = await cart.findById(id);
+    const cartItem = await cart.findOne({ _id: id, userId: req.user.id });
     if (!cartItem) {
       return res.status(404).json({ msg: "Cart item not found" });
     }
@@ -87,7 +112,7 @@ exports.increaseQuantity = async (req, res) => {
 exports.decreaseQuantity = async (req, res) => {
   try {
     const { id } = req.params; 
-    const cartItem = await cart.findById(id); 
+    const cartItem = await cart.findOne({ _id: id, userId: req.user.id }); 
     if (!cartItem) {
       return res.status(404).json({ msg: "Cart item not found" });
     }
@@ -96,7 +121,14 @@ exports.decreaseQuantity = async (req, res) => {
       await cartItem.save();
       res.status(200).json(cartItem);
     } else {
-      await cart.findByIdAndDelete(cartItem._id);
+      await cart.findOneAndDelete({ _id: cartItem._id, userId: req.user.id });
+      const user = await users.findById(req.user.id);
+      if (user) {
+        user.cartItems = (user.cartItems || []).filter(
+          (item) => String(item.productId) !== String(cartItem.productId)
+        );
+        await user.save();
+      }
       res.status(200).json({ msg: "Cart item deleted successfully" });
     }
   } catch (error) {
@@ -104,4 +136,3 @@ exports.decreaseQuantity = async (req, res) => {
     res.status(500).send("Server Error");
   }
 };
-
