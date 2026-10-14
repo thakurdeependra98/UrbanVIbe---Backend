@@ -13,6 +13,10 @@ const wishlistRoutes = require("./src/routes/wishlistRoute");
 const categoryRoutes = require("./src/routes/categoryRoute");
 const dbConnection = require("./src/dbConnection/dbConnection");
 const PORT = process.env.PORT || 5000;
+const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:8080")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
 
 if (!process.env.JWT_SECRET || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
   throw new Error("Required environment variables are missing.");
@@ -20,7 +24,13 @@ if (!process.env.JWT_SECRET || !process.env.GOOGLE_CLIENT_ID || !process.env.GOO
 
 app.use(
   cors({
-    origin: "http://localhost:8080",
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS origin not allowed: ${origin}`));
+    },
     credentials: true,
   })
 );
