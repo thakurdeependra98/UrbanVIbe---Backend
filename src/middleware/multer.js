@@ -1,24 +1,27 @@
-const multer = require('multer');
-const fs = require('fs');
-const path = require('path');
+const multer = require("multer");
 
-// Ensure the uploads directory exists
-const uploadDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true }); // Create the directory if it doesn't exist
-}
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/avif",
+  ];
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir); // Use the ensured uploads directory
-  },
-  filename: (req, file, cb) => {
-    const fileName = Date.now() + '-' + file.originalname.replace(/\s+/g, '-'); // Replace spaces with dashes
-    cb(null, fileName);
+  if (allowedTypes.includes(file.mimetype)) {
+    return cb(null, true);
+  }
+
+  return cb(new Error("Only JPEG, PNG, WebP, and AVIF images are allowed."));
+};
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    files: 1,
   },
 });
 
-const upload = multer({ storage });
-
 module.exports = upload;
-

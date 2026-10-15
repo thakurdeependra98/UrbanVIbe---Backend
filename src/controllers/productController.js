@@ -1,5 +1,40 @@
 const { default: products} = require('../models/productSchema');
 const mongoose = require('mongoose');
+const sharp = require("sharp");
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
+
+const uploadDir = path.join(__dirname, "../../uploads");
+
+const createSlug = (value) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const processUploadedImage = async (file) => {
+  if (!file) {
+    return null;
+  }
+
+  await fs.promises.mkdir(uploadDir, { recursive: true });
+
+  const filename = `${crypto.randomUUID()}.webp`;
+  const outputPath = path.join(uploadDir, filename);
+
+  await sharp(file.buffer)
+    .rotate()
+    .resize(1200, 1200, {
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .webp({ quality: 80 })
+    .toFile(outputPath);
+
+  return `/uploads/${filename}`;
+};
 
 exports.getProducts = async (req, res) => {
   try {
@@ -19,26 +54,68 @@ exports.getProducts = async (req, res) => {
   }
 };
 
-exports.crearteProduct = async (req, res) => {
+exports.createProduct = async (req, res) => {
   try {
-    const { title, description, price, oldPrice, category } = req.body;
-    const image = req.file ? `/uploads/${req.file.filename}` : req.body.image;
-    const sellerId = req.user.id;
+    const {
+      name,
+      slug,
+      brand,
+      description,
+      category,
+      subcategory,
+      price,
+      discountPrice,
+      stock,
+      sku,
+      isTodayDeal,
+      isNewArrival,
+      isBestSeller,
+      isActive,
+    } = req.body;
+
+    if (!name || !brand || !description || !category || price === undefined) {
+      return res.status(400).json({
+        msg: "name, brand, description, category, and price are required",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(category)) {
+      return res.status(400).json({ msg: "Invalid category ID" });
+    }
+
+    const image = (await processUploadedImage(req.file)) || req.body.image;
 
     const newProduct = new products({
-      title,
+      name,
+      slug: slug ? createSlug(slug) : createSlug(name),
+      brand,
       description,
-      price,
-      oldPrice,
       category,
+      subcategory,
+      price,
+      discountPrice,
+      stock,
+      sku,
       image,
-      sellerId,
+      isTodayDeal,
+      isNewArrival,
+      isBestSeller,
+      isActive,
     });
 
     await newProduct.save();
     res.status(201).json(newProduct);
   } catch (error) {
     console.error("Error creating product:", error);
+
+    if (error.name === "ValidationError" || error.name === "CastError") {
+      return res.status(400).json({ msg: error.message });
+    }
+
+    if (error.code === 11000) {
+      return res.status(409).json({ msg: "A product with this slug or SKU already exists" });
+    }
+
     res.status(500).json({ msg: "Server Error", error: error.message });
   }
 };
@@ -92,13 +169,61 @@ exports.deleteProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, price, oldPrice, category } = req.body;
-    const image = req.file ? `/uploads/${req.file.filename}` : req.body.image;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ msg: "Invalid product ID" });
+    }
+
+    const {
+      name,
+      slug,
+      brand,
+      description,
+      category,
+      subcategory,
+      price,
+      discountPrice,
+      stock,
+      sku,
+      isTodayDeal,
+      isNewArrival,
+      isBestSeller,
+      isActive,
+    } = req.body;
+    const image = req.file
+      ? await processUploadedImage(req.file)
+      : req.body.image;
+    const update = {
+      name,
+      slug: slug ? createSlug(slug) : name ? createSlug(name) : undefined,
+      brand,
+      description,
+      category,
+      subcategory,
+      price,
+      discountPrice,
+      stock,
+      sku,
+      image,
+      isTodayDeal,
+      isNewArrival,
+      isBestSeller,
+      isActive,
+    };
+
+    Object.keys(update).forEach((key) => {
+      if (update[key] === undefined) {
+        delete update[key];
+      }
+    });
+
+    if (category !== undefined && !mongoose.Types.ObjectId.isValid(category)) {
+      return res.status(400).json({ msg: "Invalid category ID" });
+    }
 
     const updatedProduct = await products.findByIdAndUpdate(
       id,
-      { title, description, price, oldPrice, category, image },
-      { new: true }
+      update,
+      { new: true, runValidators: true }
     );
 
     if (!updatedProduct) {
@@ -108,11 +233,18 @@ exports.updateProduct = async (req, res) => {
     res.status(200).json(updatedProduct);
   } catch (error) {
     console.error("Error updating product:", error); 
+
+    if (error.name === "ValidationError" || error.name === "CastError") {
+      return res.status(400).json({ msg: error.message });
+    }
+
+    if (error.code === 11000) {
+      return res.status(409).json({ msg: "A product with this slug or SKU already exists" });
+    }
+
     res.status(500).send("Server Error");
   }
 }
-
-
 
 
 
